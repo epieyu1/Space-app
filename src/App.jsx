@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, onSnapshot, doc } from 'firebase/firestore';
 import { auth, db, appId } from './utils/firebase'; 
-// Se eliminó 'Settings' de la importación de íconos
-import { LayoutDashboard, Users, Wallet, Receipt, HandCoins, FileText, Briefcase, BarChart3, FileSpreadsheet, LogOut, Bell } from 'lucide-react'; 
+import { LayoutDashboard, Users, Wallet, Receipt, HandCoins, FileText, Briefcase, BarChart3, FileSpreadsheet, LogOut, Bell, Settings } from 'lucide-react'; 
 
 // Importación de componentes
 import Login from './components/Login';
@@ -16,42 +15,32 @@ import Expenses from './components/Expenses';
 import Billing from './components/Billing';
 import Team from './components/Team';
 import Loans from './components/Loans';
-// Se eliminó la importación de SettingsView
 import NotificationsView from './components/NotificationsView'; 
+// SettingsView eliminado, importamos SettingsData si quieres gestionar datos base
+import SettingsData from './components/SettingsData'; 
 
-// --- Hook para el estado de autenticación ---
 const useAuth = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!auth) {
-            setLoading(false);
-            return;
-        }
-
+        if (!auth) { setLoading(false); return; }
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, []);
 
     return { user, loading };
 };
 
-// Componente: Compuerta de autenticación (Login)
-const AuthGate = () => {
-    return <Login />;
-};
+const AuthGate = () => <Login />;
 
-// Componente: Contenido Principal (MainApp)
 const MainApp = ({ user }) => {
     const [view, setView] = useState('dashboard');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     
-    // Estados Globales (Listeners de Firestore)
     const [clients, setClients] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [expenses, setExpenses] = useState([]);
@@ -59,12 +48,9 @@ const MainApp = ({ user }) => {
     const [bills, setBills] = useState([]);
     const [settings, setSettings] = useState(null);
     const [team, setTeam] = useState([]); 
-    
-    // NUEVOS ESTADOS para datos migrados de constantes
     const [paymentAccounts, setPaymentAccounts] = useState([]);
     const [servicesCatalog, setServicesCatalog] = useState([]);
 
-    // Carga de librería PDF
     useEffect(() => { 
         const s = document.createElement('script'); 
         s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; 
@@ -72,7 +58,6 @@ const MainApp = ({ user }) => {
         return () => document.body.removeChild(s); 
     }, []);
 
-    // Firestore Listeners
     useEffect(() => {
         if (!user || !user.email) return; 
         
@@ -83,8 +68,6 @@ const MainApp = ({ user }) => {
         const u5 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'bills')), (s) => setBills(s.docs.map(d => ({id: d.id, ...d.data()}))));
         const u6 = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'app_settings', 'general'), (d) => { if(d.exists()) setSettings(d.data()); });
         const u7 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'team')), (s) => setTeam(s.docs.map(d => ({id: d.id, ...d.data()}))));
-        
-        // NUEVOS LISTENERS para datos estáticos migrados a Firestore
         const u8 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'payment_accounts')), (s) => setPaymentAccounts(s.docs.map(d => ({id: d.id, ...d.data()}))));
         const u9 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'services_catalog')), (s) => setServicesCatalog(s.docs.map(d => ({id: d.id, ...d.data()}))));
         
@@ -101,7 +84,6 @@ const MainApp = ({ user }) => {
         const link = document.createElement("a"); link.setAttribute("href", encodeURI(csv)); link.setAttribute("download", "backup.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
     };
 
-    // Lógica para Caja Menor 
     const inc = transactions.reduce((a,c)=>a + Number(c.amountCOP || c.amount), 0);
     const exp = expenses.reduce((a,c)=>a+Number(c.amount),0);
     const lns = loans.reduce((a,c)=>a+Number(c.amount),0);
@@ -112,18 +94,40 @@ const MainApp = ({ user }) => {
         if (beneficiaries.includes('Space')) {
             return acc + (amount / beneficiaries.length);
         }
-        if (!t.beneficiaries) { // Fallback
-            return acc + (amount / 4);
-        }
+        if (!t.beneficiaries) return acc + (amount / 4);
         return acc;
     }, 0);
 
     const netSpace = spaceGrossIncome - exp - lns;
 
+    // Función para cerrar el menú al cambiar de vista en móvil
+    const handleMenuClick = (viewId) => {
+        setView(viewId);
+        setSidebarOpen(false);
+    };
+
     return (
-        <div className="flex min-h-screen bg-white text-black font-sans overflow-hidden">
-            <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r transform ${isSidebarOpen?'translate-x-0':'-translate-x-full'} md:translate-x-0 transition-transform shadow-2xl md:shadow-none flex flex-col h-full`}>
-                <div className="p-10"><h1 className="text-4xl font-black">SPACE<span className="text-[#f7c303]">.</span></h1><p className="text-[10px] font-bold uppercase tracking-widest mt-2 text-gray-400">V33.0 Secured</p></div>
+        <div className="flex min-h-screen bg-white text-black font-sans overflow-hidden relative">
+            {/* Overlay oscuro para móvil */}
+            {isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                ></div>
+            )}
+
+            {/* Sidebar Responsive */}
+            <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 shadow-2xl md:shadow-none flex flex-col h-full`}>
+                <div className="p-8 md:p-10 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-black">SPACE<span className="text-[#f7c303]">.</span></h1>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mt-2 text-gray-400">V33.0 Mobile</p>
+                    </div>
+                    <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-red-500">
+                        <LogOut size={20} className="rotate-180"/>
+                    </button>
+                </div>
+                
                 <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1">
                     {[
                         {id:'dashboard', icon:LayoutDashboard, label:'Dashboard'},
@@ -135,9 +139,9 @@ const MainApp = ({ user }) => {
                         {id:'clients', icon:Users, label:'Clientes'},
                         {id:'billing', icon:FileText, label:'Facturación'},
                         {id:'team', icon:Briefcase, label:'Equipo'},
-                        // Se eliminó la opción de Configuración del menú
+                        {id:'data', icon:Settings, label:'Datos Base'}, // Reemplaza Configuración
                     ].map(i => (
-                        <button key={i.id} onClick={()=>{setView(i.id);setSidebarOpen(false)}} className={`w-full flex items-center gap-4 px-6 py-4 text-sm font-bold rounded-2xl transition-all ${view===i.id?'bg-[#522b85] text-white shadow-lg':'text-gray-400 hover:bg-gray-50 hover:text-[#522b85]'}`}>
+                        <button key={i.id} onClick={() => handleMenuClick(i.id)} className={`w-full flex items-center gap-4 px-6 py-4 text-sm font-bold rounded-2xl transition-all ${view===i.id?'bg-[#522b85] text-white shadow-lg':'text-gray-400 hover:bg-gray-50 hover:text-[#522b85]'}`}>
                             <i.icon size={20} className={view===i.id?'text-[#f7c303]':''}/> {i.label}
                         </button>
                     ))}
@@ -147,8 +151,10 @@ const MainApp = ({ user }) => {
                     </div>
                 </div>
             </aside>
+
             <main className="flex-1 md:ml-72 overflow-y-auto h-screen relative bg-white">
-                <UserHeader user={user} />
+                <UserHeader user={user} toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />
+                
                 <div className="p-4 md:p-10 pb-20 max-w-7xl mx-auto">
                     {view === 'dashboard' && <Dashboard user={user} transactions={transactions} expenses={expenses} loans={loans} bills={bills} paymentAccounts={paymentAccounts} />}
                     {view === 'notifications' && <NotificationsView clients={clients} team={team} />}
@@ -159,30 +165,16 @@ const MainApp = ({ user }) => {
                     {view === 'loans' && <Loans user={user} spaceBalance={netSpace} settings={settings} />} 
                     {view === 'billing' && <Billing user={user} clients={clients} settings={settings} paymentAccounts={paymentAccounts} servicesCatalog={servicesCatalog} />}
                     {view === 'team' && <Team user={user} />}
-                    {/* Se eliminó la renderización de SettingsView */}
+                    {view === 'data' && <SettingsData paymentAccounts={paymentAccounts} servicesCatalog={servicesCatalog} />}
                 </div>
             </main>
         </div>
     );
 };
 
-// Exportar el componente principal
 export default function App() {
   const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-xl text-indigo-600 font-semibold">Cargando autenticación...</div>
-      </div>
-    );
-  }
-
-  // Si está autenticado con email, mostramos la aplicación principal
-  if (user && user.email) {
-    return <MainApp user={user} />;
-  }
-
-  // Si no está autenticado, mostramos el Login
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
+  if (user && user.email) return <MainApp user={user} />;
   return <AuthGate />;
 }

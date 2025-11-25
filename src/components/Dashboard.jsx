@@ -2,10 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, appId } from '../utils/firebase';
 import { formatCurrency, convertToBase64, motivationalQuotes } from '../utils/helpers';
-// ELIMINADO: import { PAYMENT_ACCOUNTS } ... (Esto causaba el error)
 import { Bell, AlertTriangle, MessageCircle, CheckCircle2, Camera } from 'lucide-react';
 
-const Dashboard = ({ user, transactions, expenses, loans, bills, paymentAccounts }) => { // Recibe paymentAccounts
+const Dashboard = ({ user, transactions, expenses, loans, bills, paymentAccounts }) => {
   const [quote, setQuote] = useState('');
   const [partnerImages, setPartnerImages] = useState({});
   const [checkedAlerts, setCheckedAlerts] = useState({}); 
@@ -46,9 +45,7 @@ const Dashboard = ({ user, transactions, expenses, loans, bills, paymentAccounts
   };
 
   const copyReminder = (alert) => {
-    // Busca la cuenta en la lista dinámica o usa la primera disponible
     const account = (paymentAccounts && paymentAccounts.find(a => a.id === alert.targetAccount)) || (paymentAccounts ? paymentAccounts[0] : { type: 'N/A', number: '', owner: '' });
-    
     const msg = `Hola ${alert.clientName}, recordatorio de pago ${alert.concept}. Cuenta: ${account.type} ${account.number} (${account.owner}).`;
     const ta = document.createElement("textarea"); ta.value = msg; ta.style.position="fixed"; ta.style.left="-9999px"; document.body.appendChild(ta); ta.focus(); ta.select(); try { document.execCommand('copy'); alert('Copiado'); } catch(e){} document.body.removeChild(ta);
   };
@@ -57,12 +54,10 @@ const Dashboard = ({ user, transactions, expenses, loans, bills, paymentAccounts
     setCheckedAlerts(prev => ({...prev, [id]: true}));
   };
 
-  // Cálculo de ingresos (usando amountCOP si existe)
   const inc = transactions.reduce((a,c)=>a + Number(c.amountCOP || c.amount), 0);
   const exp = expenses.reduce((a,c)=>a+Number(c.amount),0);
   const lns = loans.reduce((a,c)=>a+Number(c.amount),0);
   
-  // Lógica de saldos
   const partnerBalances = { 'Luis': 0, 'Israel': 0, 'Anthony': 0, 'Space': 0 };
   transactions.forEach(t => { 
       const amount = Number(t.amountCOP || t.amount); 
@@ -81,12 +76,20 @@ const Dashboard = ({ user, transactions, expenses, loans, bills, paymentAccounts
 
   return (
     <div className="space-y-8">
-      {alerts.length > 0 && (<div className="bg-white p-6 rounded-3xl shadow-lg border-l-4 border-[#f7c303] animate-fade-in-down"><h3 className="text-xl font-black text-[#000000] mb-4 flex items-center gap-2"><Bell className="text-[#f7c303] fill-current" /> Cobros Pendientes</h3><div className="grid gap-4">{alerts.map(alert => (<div key={alert.id} className="bg-gray-50 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4 border border-gray-100"><div className="flex items-center gap-4 w-full"><div className={`p-3 rounded-full ${alert.daysLeft < 0 ? 'bg-red-100 text-red-600' : 'bg-[#f7c303]/20 text-[#d4a000]'}`}>{alert.daysLeft < 0 ? <AlertTriangle size={20}/> : <Bell size={20}/>}</div><div><h4 className="font-bold text-lg">{alert.clientName}</h4><p className="text-sm text-gray-500">{alert.concept} • {alert.daysLeft < 0 ? 'Vencido' : 'Próximo'}</p></div></div><div className="flex gap-2 w-full md:w-auto"><button onClick={() => copyReminder(alert)} className="flex-1 md:flex-none bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2"><MessageCircle size={16}/> WhatsApp</button><button onClick={() => dismissAlert(alert.id)} className="flex-1 md:flex-none bg-gray-200 hover:bg-gray-300 text-gray-600 px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2"><CheckCircle2 size={16}/> Listo</button></div></div>))}</div></div>)}
+      {/* Alertas: Se apilan en móvil */}
+      {alerts.length > 0 && (<div className="bg-white p-6 rounded-3xl shadow-lg border-l-4 border-[#f7c303] animate-fade-in-down"><h3 className="text-xl font-black text-[#000000] mb-4 flex items-center gap-2"><Bell className="text-[#f7c303] fill-current" /> Cobros Pendientes</h3><div className="grid gap-4">{alerts.map(alert => (<div key={alert.id} className="bg-gray-50 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4 border border-gray-100"><div className="flex items-center gap-4 w-full"><div className={`p-3 rounded-full ${alert.daysLeft < 0 ? 'bg-red-100 text-red-600' : 'bg-[#f7c303]/20 text-[#d4a000]'}`}>{alert.daysLeft < 0 ? <AlertTriangle size={20}/> : <Bell size={20}/>}</div><div><h4 className="font-bold text-lg">{alert.clientName}</h4><p className="text-sm text-gray-500">{alert.concept} • {alert.daysLeft < 0 ? 'Vencido' : 'Próximo'}</p></div></div><div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0"><button onClick={() => copyReminder(alert)} className="flex-1 md:flex-none bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2"><MessageCircle size={16}/> WhatsApp</button><button onClick={() => dismissAlert(alert.id)} className="flex-1 md:flex-none bg-gray-200 hover:bg-gray-300 text-gray-600 px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2"><CheckCircle2 size={16}/> Listo</button></div></div>))}</div></div>)}
 
-      <div className="bg-gradient-to-r from-black to-[#1a1a1a] rounded-[2.5rem] p-10 text-white shadow-2xl border-b-4 border-[#f7c303]"><h2 className="text-4xl font-black mb-3">Hola, Equipo <span className="text-[#f7c303]">🚀</span></h2><p className="opacity-80 italic font-light border-l-2 border-[#522b85] pl-4">"{quote}"</p></div>
-      <div className="grid md:grid-cols-3 gap-6"><div className="bg-white p-8 rounded-3xl shadow-lg"><h3 className="text-gray-400 font-bold text-xs tracking-widest mb-6">INGRESOS TOTALES (COP)</h3><p className="text-4xl font-black">{formatCurrency(inc)}</p></div><div className="bg-white p-8 rounded-3xl shadow-lg"><h3 className="text-gray-400 font-bold text-xs tracking-widest mb-6">GASTOS</h3><p className="text-4xl font-black">{formatCurrency(exp)}</p></div><div className="bg-white p-8 rounded-3xl shadow-lg"><h3 className="text-gray-400 font-bold text-xs tracking-widest mb-6">PRÉSTAMOS</h3><p className="text-4xl font-black">{formatCurrency(lns)}</p></div></div>
+      <div className="bg-gradient-to-r from-black to-[#1a1a1a] rounded-[2.5rem] p-8 md:p-10 text-white shadow-2xl border-b-4 border-[#f7c303]"><h2 className="text-2xl md:text-4xl font-black mb-3">Hola, Equipo <span className="text-[#f7c303]">🚀</span></h2><p className="opacity-80 italic font-light border-l-2 border-[#522b85] pl-4 text-sm md:text-base">"{quote}"</p></div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+      {/* Resumen: 1 columna en móvil, 3 en desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-8 rounded-3xl shadow-lg"><h3 className="text-gray-400 font-bold text-xs tracking-widest mb-6">INGRESOS TOTALES (COP)</h3><p className="text-3xl md:text-4xl font-black">{formatCurrency(inc)}</p></div>
+          <div className="bg-white p-8 rounded-3xl shadow-lg"><h3 className="text-gray-400 font-bold text-xs tracking-widest mb-6">GASTOS</h3><p className="text-3xl md:text-4xl font-black">{formatCurrency(exp)}</p></div>
+          <div className="bg-white p-8 rounded-3xl shadow-lg"><h3 className="text-gray-400 font-bold text-xs tracking-widest mb-6">PRÉSTAMOS</h3><p className="text-3xl md:text-4xl font-black">{formatCurrency(lns)}</p></div>
+      </div>
+      
+      {/* Socios: 1 col móvil, 2 col tablet, 4 col desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         {['Luis','Israel','Anthony'].map(p=>(
           <div key={p} className="bg-white p-6 rounded-3xl shadow-sm flex flex-col items-center relative group">
             <div className="w-20 h-20 rounded-full bg-gray-50 border-4 border-white shadow-lg mb-4 overflow-hidden flex items-center justify-center">
