@@ -10,10 +10,10 @@ export const formatCurrency = (value, currency = 'COP') => {
     currency: currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 2
-  }).format(value);
+  }).format(value || 0);
 };
 
-// Función para procesar y redimensionar imágenes (usada para perfiles y soportes)
+// Función para procesar y redimensionar imágenes
 export const processImage = (file, maxWidth = 800) => {
   return new Promise((resolve, reject) => { 
     const reader = new FileReader();
@@ -41,7 +41,6 @@ export const processImage = (file, maxWidth = 800) => {
   });
 };
 
-// Utiliza la función redimensionada para Base64
 export const convertToBase64 = (file) => {
   return processImage(file, 600); 
 };
@@ -53,13 +52,4 @@ export const motivationalQuotes = [
   "La calidad es el mejor plan de negocios.",
   "Hazlo simple, pero significativo.",
   "El éxito es la suma de pequeños esfuerzos repetidos día día."
-];
-
-export const SERVICES_CATALOG = [
-  { name: 'Gestión Redes Sociales (Básico)', prices: { COP: 1200000, USD: 350, EUR: 320 } },
-  { name: 'Gestión Redes Sociales (Pro)', prices: { COP: 2500000, USD: 700, EUR: 650 } },
-  { name: 'Diseño de Logotipo', prices: { COP: 800000, USD: 250, EUR: 230 } },
-  { name: 'Diseño Página Web (Landing)', prices: { COP: 1500000, USD: 450, EUR: 420 } },
-  { name: 'Manual de Marca', prices: { COP: 2000000, USD: 600, EUR: 550 } },
-  { name: 'Consultoría (Hora)', prices: { COP: 200000, USD: 60, EUR: 55 } },
 ];

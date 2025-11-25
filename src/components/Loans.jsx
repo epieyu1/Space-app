@@ -5,7 +5,7 @@ import { formatCurrency } from '../utils/helpers';
 import { generateBrandedPDF } from '../utils/pdfGenerator';
 import { HandCoins, AlertTriangle, FileSignature, Trash2 } from 'lucide-react';
 
-const Loans = ({ user, spaceBalance }) => {
+const Loans = ({ user, settings, spaceBalance }) => {
   const [amount, setAmount] = useState('');
   const [borrower, setBorrower] = useState('');
   const [date, setDate] = useState('');
@@ -22,6 +22,7 @@ const Loans = ({ user, spaceBalance }) => {
   }, [user]);
 
   const generateLoanPDF = (loanData) => {
+    // Pasa 'settings' como último argumento
     const doc = generateBrandedPDF("COMPROBANTE DE PRÉSTAMO", (d, y) => {
        d.setFillColor(245, 245, 245); d.roundedRect(20, y, 170, 30, 3, 3, 'F');
        d.setFontSize(10); d.setFont("helvetica", "bold"); d.text("BENEFICIARIO:", 25, y+10);
@@ -39,23 +40,15 @@ const Loans = ({ user, spaceBalance }) => {
        d.line(20, y, 80, y); d.text("Firma Beneficiario", 20, y+5);
        d.line(110, y, 170, y); d.text("Firma Autoriza (Space)", 110, y+5);
        return y + 20;
-    });
+    }, settings);
     doc.save(`Prestamo_${loanData.borrower}.pdf`);
   };
 
   const addLoan = async (e) => {
     e.preventDefault();
     const loanDate = date ? new Date(date) : new Date();
-    const newLoan = {
-      amount: Number(amount),
-      borrower,
-      concept,
-      date: Timestamp.fromDate(loanDate),
-      createdAt: Timestamp.now()
-    };
-    
+    const newLoan = { amount: Number(amount), borrower, concept, date: Timestamp.fromDate(loanDate), createdAt: Timestamp.now() };
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'loans'), newLoan);
-    // Generar PDF después de guardar
     generateLoanPDF(newLoan);
     setAmount(''); setBorrower(''); setConcept(''); setDate('');
   };
@@ -75,19 +68,7 @@ const Loans = ({ user, spaceBalance }) => {
             Disponible: {formatCurrency(spaceBalance)}
           </div>
         </div>
-        
-        <form onSubmit={addLoan} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Beneficiario</label><input value={borrower} onChange={e=>setBorrower(e.target.value)} className="w-full p-4 border rounded-xl font-medium bg-gray-50" placeholder="Nombre Completo" required/></div>
-            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Fecha del Préstamo</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full p-4 border rounded-xl bg-gray-50" required/></div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Monto (COP)</label><input type="number" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full p-4 border rounded-xl text-xl font-bold text-[#d4a000] bg-gray-50" placeholder="0.00" required/></div>
-             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Concepto / Motivo</label><input value={concept} onChange={e=>setConcept(e.target.value)} className="w-full p-4 border rounded-xl bg-gray-50" placeholder="Ej: Adelanto de nómina" required/></div>
-          </div>
-          {Number(amount) > spaceBalance && <p className="text-red-500 text-xs font-bold flex items-center gap-1"><AlertTriangle size={12}/> Advertencia: El monto excede el saldo de Caja Menor disponible.</p>}
-          <button className="w-full bg-[#522b85] hover:bg-[#3e1f66] text-white font-bold py-4 rounded-xl shadow-lg shadow-[#522b85]/20 transition-all">Registrar y Generar PDF</button>
-        </form>
+        <form onSubmit={addLoan} className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Beneficiario</label><input value={borrower} onChange={e=>setBorrower(e.target.value)} className="w-full p-4 border rounded-xl font-medium bg-gray-50" placeholder="Nombre Completo" required/></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Fecha del Préstamo</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full p-4 border rounded-xl bg-gray-50" required/></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Monto (COP)</label><input type="number" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full p-4 border rounded-xl text-xl font-bold text-[#d4a000] bg-gray-50" placeholder="0.00" required/></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Concepto / Motivo</label><input value={concept} onChange={e=>setConcept(e.target.value)} className="w-full p-4 border rounded-xl bg-gray-50" placeholder="Ej: Adelanto de nómina" required/></div></div>{Number(amount) > spaceBalance && <p className="text-red-500 text-xs font-bold flex items-center gap-1"><AlertTriangle size={12}/> Advertencia: El monto excede el saldo de Caja Menor disponible.</p>}<button className="w-full bg-[#522b85] hover:bg-[#3e1f66] text-white font-bold py-4 rounded-xl shadow-lg shadow-[#522b85]/20 transition-all">Registrar y Generar PDF</button></form>
       </div>
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
         <h3 className="text-xl font-black mb-6 text-[#000000]">Libro de Préstamos</h3>

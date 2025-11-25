@@ -2,44 +2,130 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, addDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db, appId } from '../utils/firebase';
 import { formatCurrency, convertToBase64 } from '../utils/helpers';
-import { Upload, CheckCircle2, Eye, Trash2 } from 'lucide-react';
+// La importación de la IA ha sido ELIMINADA por seguridad
+import { Upload, CheckCircle2, Eye, Trash2, Repeat, Zap } from 'lucide-react';
 
 const Expenses = ({ user }) => {
   const [amount, setAmount] = useState(''); 
   const [description, setDescription] = useState(''); 
   const [expenses, setExpenses] = useState([]); 
   const [supportBase64, setSupportBase64] = useState('');
-  
-  useEffect(() => { if(!user) return; const unsub = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses')), (s) => setExpenses(s.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, [user]);
-  
+  const [type, setType] = useState('Eventual'); 
+  const [fixedExpenses, setFixedExpenses] = useState([]);
+
+  // Listeners
+  useEffect(() => { 
+    if(!user) return; 
+    const u1 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses')), (s) => setExpenses(s.docs.map(d => ({id: d.id, ...d.data()})))); 
+    const u2 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'fixed_expenses')), (s) => setFixedExpenses(s.docs.map(d => ({id: d.id, ...d.data()})))); 
+    return () => { u1(); u2(); }; 
+  }, [user]);
+
   const handleFile = async (e) => { 
       const f = e.target.files[0]; 
       if(!f) return; 
       try { 
-          // Redimensiona la imagen a un tamaño razonable para Base64
+          // Usa convertToBase64 (sin IA) para guardar el comprobante
           setSupportBase64(await convertToBase64(f)); 
-      } catch(e){
-          console.error("Error processing image:", e);
+      } catch(e){ 
+          console.error("Error processing image:", e); 
       } 
   };
   
   const add = async (e) => { 
       e.preventDefault(); 
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), { 
-          amount: Number(amount), 
-          description, 
-          supportBase64, 
-          date: Timestamp.now(), 
-          createdBy: user.uid 
+          amount: Number(amount), description, supportBase64, date: Timestamp.now(), createdBy: user.uid, type 
       }); 
-      setAmount(''); 
-      setDescription(''); 
-      setSupportBase64(''); 
+      
+      // Si es gasto Fijo, lo guardamos en la colección de fijos para re-uso
+      if (type === 'Fijo') { 
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fixed_expenses'), { 
+              amount: Number(amount), description, createdBy: user.uid 
+          }); 
+      } 
+      
+      setAmount(''); setDescription(''); setSupportBase64(''); setType('Eventual'); 
+  };
+  
+  const loadFixed = async () => { 
+      if(window.confirm('¿Cargar todos los gastos fijos del mes?')) { 
+          fixedExpenses.forEach(async (fe) => { 
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), { 
+                  amount: fe.amount, 
+                  description: fe.description, 
+                  date: Timestamp.now(), 
+                  type: 'Fijo (Cargado)', 
+                  createdBy: user.uid 
+              }); 
+          }); 
+      } 
   };
   
   const del = async (id) => { if(window.confirm('¿Borrar Gasto?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', id)); };
   const viewSupport = (b64) => { const win = window.open(); win.document.write(`<img src="${b64}" style="max-width:100%">`); };
   
-  return ( <div className="space-y-8"><div className="bg-white p-8 rounded-3xl shadow-lg h-fit"><h3 className="text-2xl font-black mb-6 text-red-500">Gasto</h3><form onSubmit={add} className="space-y-6"><label className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-300 transition-colors"><input type="file" className="hidden" onChange={handleFile} accept="image/*"/>{supportBase64 ? <><CheckCircle2 className="text-green-600 mb-2"/> <p className="text-sm font-bold text-green-600">Comprobante Adjunto</p></> : <><Upload className="text-gray-400 mb-2"/><p className="text-sm font-bold text-gray-500">Subir Comprobante (Opcional)</p></>}</label><div className="grid md:grid-cols-2 gap-6"><input type="number" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full p-4 border rounded-xl text-xl font-bold" placeholder="0" required/><input value={description} onChange={e=>setDescription(e.target.value)} className="w-full p-4 border rounded-xl" placeholder="Descripción" required/></div><button className="w-full bg-red-500 text-white font-bold py-4 rounded-xl">Guardar Gasto</button></form></div><div className="bg-white p-8 rounded-3xl shadow-sm border"><h3 className="text-xl font-black mb-6">Historial</h3>{expenses.map(e=><div key={e.id} className="flex justify-between p-4 border-b"><div><p className="font-bold">{e.description}</p></div><div className="flex items-center gap-4">{e.supportBase64 && <button onClick={()=>viewSupport(e.supportBase64)} className="text-gray-400 hover:text-blue-500"><Eye size={20}/></button>}<span className="font-black text-red-500">-{formatCurrency(e.amount)}</span><button onClick={()=>del(e.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={20}/></button></div></div>)}</div></div> );
+  return ( 
+    <div className="space-y-8">
+        <div className="bg-white p-8 rounded-3xl shadow-lg h-fit">
+            <h3 className="text-2xl font-black mb-6 text-red-500">Gasto</h3>
+            <form onSubmit={add} className="space-y-6">
+                {/* Selector Tipo */}
+                <div className="flex gap-4">
+                    <button type="button" onClick={() => setType('Eventual')} className={`flex-1 py-3 rounded-xl font-bold border-2 ${type==='Eventual' ? 'border-red-500 bg-red-50' : 'border-gray-100 text-gray-500'}`}><Zap size={16} className="inline mr-1"/> Eventual</button>
+                    <button type="button" onClick={() => setType('Fijo')} className={`flex-1 py-3 rounded-xl font-bold border-2 ${type==='Fijo' ? 'border-[#522b85] bg-[#522b85]/10' : 'border-gray-100 text-gray-500'}`}><Repeat size={16} className="inline mr-1"/> Fijo</button>
+                </div>
+                
+                {/* Subir Comprobante */}
+                <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-300 transition-colors">
+                    <input type="file" className="hidden" onChange={handleFile} accept="image/*"/>
+                    {supportBase64 ? <><CheckCircle2 className="text-green-600 mb-2"/> <p className="text-sm font-bold text-green-600">Comprobante Adjunto</p></> : <><Upload className="text-gray-400 mb-2"/><p className="text-sm font-bold text-gray-500">Subir Comprobante (Opcional)</p></>}
+                </label>
+                
+                {/* Monto y Descripción */}
+                <div className="grid md:grid-cols-2 gap-6">
+                    <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full p-4 border rounded-xl text-xl font-bold" placeholder="0" required/>
+                    <input value={description} onChange={e=>setDescription(e.target.value)} className="w-full p-4 border rounded-xl" placeholder="Descripción" required/>
+                </div>
+                
+                <button className="w-full bg-red-500 text-white font-bold py-4 rounded-xl">Guardar Gasto</button>
+            </form>
+        </div>
+        
+        <div className="grid lg:grid-cols-2 gap-8">
+            {/* Historial de Gastos */}
+            <div className="bg-white p-8 rounded-3xl shadow-sm border">
+                <h3 className="text-xl font-black mb-6">Historial</h3>
+                {expenses.map(e=><div key={e.id} className="flex justify-between p-4 border-b">
+                    <div>
+                        <p className="font-bold">{e.description}</p>
+                        <p className={`text-xs ${e.type === 'Fijo' ? 'text-[#522b85]' : 'text-gray-400'}`}>{e.type}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        {e.supportBase64 && <button onClick={()=>viewSupport(e.supportBase64)} className="text-gray-400 hover:text-blue-500" title="Ver comprobante"><Eye size={20}/></button>}
+                        <span className="font-black text-red-500">-{formatCurrency(e.amount)}</span>
+                        <button onClick={()=>del(e.id)} className="text-gray-300 hover:text-red-500" title="Eliminar"><Trash2 size={20}/></button>
+                    </div>
+                </div>)}
+            </div>
+
+            {/* Listado de Gastos Fijos */}
+            <div className="bg-gray-50 p-8 rounded-3xl border h-fit">
+                <div className="flex justify-between mb-4 border-b pb-3">
+                    <h3 className="font-black flex items-center gap-2"><Repeat size={20}/> Gastos Fijos (Plantilla)</h3>
+                    <button onClick={loadFixed} className="text-xs bg-[#f7c303] px-3 py-1 rounded font-bold hover:bg-yellow-400">Cargar al Mes</button>
+                </div>
+                {fixedExpenses.length === 0 ? (
+                    <p className="text-sm text-gray-400 mt-4">Aún no hay gastos fijos registrados (Ej: Servicios, SaaS, Renta).</p>
+                ) : (
+                    fixedExpenses.map(fe=><div key={fe.id} className="bg-white p-3 rounded-lg shadow-sm mb-2 flex justify-between">
+                        <p className="text-sm font-bold">{fe.description}</p>
+                        <p className="text-xs font-black text-[#522b85]">{formatCurrency(fe.amount)}</p>
+                    </div>)
+                )}
+            </div>
+        </div>
+    </div> 
+  );
 };
 export default Expenses;
