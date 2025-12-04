@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { auth, db, appId } from '../utils/firebase';
 
@@ -10,38 +10,49 @@ const Login = () => {
   const [jobTitle, setJobTitle] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
+
     try {
       if (isRegistering) {
+        // Lógica de Registro
         if (!fullName || !jobTitle) {
-          setError('Por favor completa todos los campos.');
-          return;
+          throw new Error('Por favor completa todos los campos.');
         }
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Save User Profile
+        
+        // Guardar perfil en Firestore
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_profiles', userCredential.user.uid), {
           fullName,
           jobTitle,
           email,
           createdAt: Timestamp.now(),
-          photoBase64: ''
+          photoBase64: '' 
         });
       } else {
+        // Lógica de Login
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      console.error(err);
-      if (err.code === 'auth/email-already-in-use' && isRegistering) {
-          setError('Ese correo ya existe. Vuelve a iniciar sesión.');
-          setIsRegistering(false); 
-      } else if (!isRegistering) {
-        setError('Credenciales inválidas. ¿Olvidaste registrarte?');
+      console.error("Error de autenticación:", err);
+      
+      // Manejo de errores comunes
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Correo o contraseña incorrectos.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('Este correo ya está registrado. Intenta iniciar sesión.');
+        setIsRegistering(false);
+      } else if (err.code === 'auth/weak-password') {
+        setError('La contraseña debe tener al menos 6 caracteres.');
       } else {
-        setError('Error en registro: ' + err.message);
+        setError('Error: ' + err.message);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,35 +64,80 @@ const Login = () => {
           <h1 className="text-5xl font-black tracking-tighter text-[#000000]">SPACE<span className="text-[#f7c303]">.</span></h1>
           <p className="text-[#522b85] mt-2 font-bold tracking-widest text-xs uppercase">Finanzas Creativas</p>
         </div>
-        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+        
+        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">{error}</div>}
+        
         <form onSubmit={handleAuth} className="space-y-4">
           {isRegistering && (
             <>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre Completo</label>
-                <input type="text" required className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none transition-all" placeholder="Ej: Ana Maria" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none transition-all" 
+                  placeholder="Ej: Ana Maria" 
+                  value={fullName} 
+                  onChange={(e) => setFullName(e.target.value)} 
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cargo / Puesto</label>
-                <input type="text" required className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none transition-all" placeholder="Ej: Directora General" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none transition-all" 
+                  placeholder="Ej: Directora General" 
+                  value={jobTitle} 
+                  onChange={(e) => setJobTitle(e.target.value)} 
+                />
               </div>
             </>
           )}
+          
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
-            <input type="email" required className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none" placeholder="admin@spacecreativa.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input 
+              type="email" 
+              required 
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none" 
+              placeholder="admin@spacecreativa.com" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+            />
           </div>
+          
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contraseña</label>
-            <input type="password" required className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input 
+              type="password" 
+              required 
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-[#522b85] outline-none" 
+              placeholder="••••••••" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+            />
           </div>
-          <button className="w-full bg-[#522b85] hover:bg-[#3e1f66] text-white font-bold py-4 rounded-xl transition-all shadow-lg">{isRegistering ? 'Registrar Usuario' : 'Entrar'}</button>
+          
+          <button 
+            disabled={loading}
+            className="w-full bg-[#522b85] hover:bg-[#3e1f66] text-white font-bold py-4 rounded-xl transition-all shadow-lg disabled:opacity-50"
+          >
+            {loading ? 'Cargando...' : (isRegistering ? 'Registrar Usuario' : 'Entrar')}
+          </button>
         </form>
+        
         <div className="mt-8 text-center">
-          <button onClick={() => setIsRegistering(!isRegistering)} className="text-sm text-[#f7c303] font-bold underline">{isRegistering ? 'Volver a Iniciar sesión' : 'Registrar nueva cuenta'}</button>
+          <button 
+            onClick={() => { setIsRegistering(!isRegistering); setError(''); }} 
+            className="text-sm text-[#f7c303] font-bold underline hover:text-[#d4a000]"
+          >
+            {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : 'Registrar nueva cuenta'}
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
 export default Login;

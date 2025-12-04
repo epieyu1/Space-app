@@ -31,7 +31,6 @@ const PaymentAccountsManager = ({ accounts }) => {
 
     const addOrUpdateAccount = async (e) => {
         e.preventDefault();
-        // Usamos el número como ID para evitar duplicados fáciles
         const docId = form.id || form.number.replace(/\D/g, ''); 
         if (!docId) { alert("El número de cuenta es requerido."); return; }
         

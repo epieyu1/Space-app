@@ -22,7 +22,6 @@ const Loans = ({ user, settings, spaceBalance }) => {
   }, [user]);
 
   const generateLoanPDF = (loanData) => {
-    // Pasa 'settings' como último argumento
     const doc = generateBrandedPDF("COMPROBANTE DE PRÉSTAMO", (d, y) => {
        d.setFillColor(245, 245, 245); d.roundedRect(20, y, 170, 30, 3, 3, 'F');
        d.setFontSize(10); d.setFont("helvetica", "bold"); d.text("BENEFICIARIO:", 25, y+10);
